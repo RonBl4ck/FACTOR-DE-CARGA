@@ -1,6 +1,7 @@
 """
 Análisis de Carga Eléctrica - Aplicación Streamlit
 Sistema completo con gráficos, calculadora de proyección y configuración de intervalos
+Organizado en pestañas para mejor navegación
 """
 
 import streamlit as st
@@ -29,6 +30,8 @@ st.markdown("""
                                           box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; }
     .calc-result { background: #f0f7ff; border-left: 4px solid #1E88E5; padding: 15px; border-radius: 5px; margin: 10px 0; }
     .sidebar-config { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+    div[data-baseweb="tab-list"] { gap: 8px; }
+    div[data-baseweb="tab"] { padding: 10px 20px; font-size: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -489,7 +492,7 @@ def plot_daily_profile(daily_profile, projection_profile=None, show_markers=True
         title='📊 Perfil Diario Promedio',
         xaxis_title='Hora del día', yaxis_title='Potencia (kVA)',
         xaxis=dict(tickmode='linear', tick0=0, dtick=2, range=[0, 24]),
-        hovermode='x unified', height=450,
+        hovermode='x unified', height=400,
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
     return fig
@@ -551,7 +554,7 @@ def plot_weekly_profile(weekly_profile, projection_profile=None, show_markers=Tr
         title='📊 Perfil Semanal Continuo (Lunes a Domingo)',
         xaxis_title='Día de la semana', yaxis_title='Potencia (kVA)',
         xaxis=dict(tickmode='array', tickvals=tickvals, ticktext=dias_labels),
-        hovermode='x unified', height=450,
+        hovermode='x unified', height=400,
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
     return fig
@@ -613,7 +616,7 @@ def plot_total_profile(df, highlight_date=None, projection_data=None, show_marke
     fig.update_layout(
         title='📊 Perfil Total - Todos los Días',
         xaxis_title='Fecha/Hora', yaxis_title='Potencia (kVA)',
-        hovermode='x unified', height=450,
+        hovermode='x unified', height=400,
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
     )
     return fig
@@ -672,15 +675,11 @@ def main():
     st.sidebar.image("https://img.icons8.com/fluency/96/electricity.png", width=80)
     st.sidebar.title("⚙️ Configuración")
     
-    # Intervalo de tiempo
+    # Intervalo de tiempo - SOLO 10 MIN Y 1 HORA
     st.sidebar.markdown("### 📐 Intervalo de datos")
     interval_options = {
-        "Original (sin modificar)": 0,
-        "10 minutos": 10,
-        "15 minutos": 15,
-        "30 minutos": 30,
-        "1 hora": 60,
-        "2 horas": 120
+        "Original (10 min)": 0,
+        "1 hora": 60
     }
     
     selected_interval_name = st.sidebar.selectbox(
@@ -703,7 +702,7 @@ def main():
     if interval_minutes > 0:
         st.sidebar.info(f"📊 Datos agrupados cada {interval_minutes} minutos")
     else:
-        st.sidebar.info("📊 Datos originales sin modificar")
+        st.sidebar.info("📊 Datos originales (10 min)")
     
     # ==================== PROCESAMIENTO ====================
     if uploaded_file is not None:
@@ -746,7 +745,6 @@ def main():
                 transformer_info['sed'] = data_sheet_name
             
             # === INFO TRANSFORMADOR ===
-            st.markdown("---")
             col1, col2, col3, col4 = st.columns(4)
             with col1: st.metric("🏷️ SED", transformer_info['sed'])
             with col2: st.metric("⚡ Capacidad", f"{transformer_info['kva_nominal']} kVA")
@@ -759,7 +757,6 @@ def main():
             st.info(f"📐 **Intervalo seleccionado:** {selected_interval_name} | Datos procesados: {len(df)} registros")
             
             # === ESTADO ===
-            st.markdown("---")
             critical = sum([kpis['utilization'] > 90, kpis['power_factor'] < 0.85, kpis['max_tdd'] > 8, 
                            kpis['max_pst'] > 1, kpis['voltage_unbalance'] > 5, kpis['current_unbalance'] > 15])
             warning = sum([75 < kpis['utilization'] <= 90, 0.85 <= kpis['power_factor'] < 0.92,
@@ -772,9 +769,7 @@ def main():
             else:
                 st.success("🟢 Estado Normal")
             
-            # === KPIs ===
-            st.markdown("---")
-            st.subheader("📈 Métricas Clave")
+            # === KPIs EN FILA COMPACTA ===
             col1, col2, col3, col4 = st.columns(4)
             with col1: st.metric("⚡ Utilización", f"{kpis['utilization']:.1f}%")
             with col2: st.metric("🔋 Pot. Máx", f"{kpis['max_power_kva']:.2f} kVA", f"a las {kpis.get('max_hour', 0):.1f}h")
@@ -782,212 +777,217 @@ def main():
             with col4: st.metric("💡 PST Máx", f"{kpis['max_pst']:.3f}")
             
             # =====================================================
-            # === SECCIÓN DE GRÁFICOS DE POTENCIA CON CALCULADORA ===
+            # === PESTAÑAS PRINCIPALES ===
             # =====================================================
             st.markdown("---")
-            st.markdown("## 📊 Análisis de Potencia con Calculadora de Proyección")
+            main_tabs = st.tabs(["📊 Potencia", "📈 Voltaje/Corriente", "🧮 Calculadoras"])
             
-            tab1, tab2, tab3 = st.tabs(["📅 Diario", "📆 Semanal", "📊 Total"])
+            # ============== PESTAÑA: POTENCIA ==============
+            with main_tabs[0]:
+                st.markdown("### Análisis de Potencia")
+                
+                power_tabs = st.tabs(["📅 Diario", "📆 Semanal", "📊 Total"])
+                
+                # --- Diario ---
+                with power_tabs[0]:
+                    st.markdown(f"**Promedio de todos los días** | Intervalo: {selected_interval_name}")
+                    st.plotly_chart(plot_daily_profile(daily_profile, show_markers=show_markers), use_container_width=True)
+                
+                # --- Semanal ---
+                with power_tabs[1]:
+                    st.markdown("**Lunes → Domingo (168 horas continuas)**")
+                    st.plotly_chart(plot_weekly_profile(weekly_profile, show_markers=show_markers), use_container_width=True)
+                
+                # --- Total ---
+                with power_tabs[2]:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        available_dates = sorted(df['starttime'].dt.date.unique())
+                        selected_date = st.selectbox("Resaltar día", 
+                                                     ["Ninguno"] + [str(d) for d in available_dates],
+                                                     key="total_date")
+                        highlight_date = None if selected_date == "Ninguno" else datetime.strptime(selected_date, "%Y-%m-%d").date()
+                    
+                    with col2:
+                        st.metric("🔺 Día MÁXIMA", str(kpis.get('max_date', 'N/A')))
+                        st.metric("🔻 Día MÍNIMA", str(kpis.get('min_date', 'N/A')))
+                    
+                    st.plotly_chart(plot_total_profile(df, highlight_date, show_markers=show_markers), use_container_width=True)
             
-            # ============== GRÁFICO DIARIO ==============
-            with tab1:
-                st.markdown("### Perfil Diario Promedio")
-                st.markdown(f"Promedio de todos los días | Intervalo: **{selected_interval_name}**")
-                
-                st.plotly_chart(plot_daily_profile(daily_profile, show_markers=show_markers), use_container_width=True)
-                
-                # Calculadora diaria
-                st.markdown("---")
-                st.markdown("### 🧮 Calculadora de Proyección Diaria")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    calc_power = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="daily_power")
-                with col2:
-                    calc_hour = st.number_input("Hora de medición", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="daily_hour",
-                                               help="Hora en formato decimal (ej: 14.5 = 14:30)")
-                with col3:
-                    st.metric("Intervalo actual", f"{interval_minutes if interval_minutes > 0 else 10} min")
-                
-                if st.button("🔮 Calcular Proyección Diaria", key="calc_daily", type="primary"):
-                    result, proj_profile = calculate_daily_projection(daily_profile, calc_power, calc_hour, 
-                                                                      interval_minutes if interval_minutes > 0 else 10)
-                    
-                    st.markdown("<div class='calc-result'>", unsafe_allow_html=True)
-                    st.markdown(f"**📈 Factor de proporción:** `{result['factor_proporcion']:.4f}`")
-                    st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA` a las **`{result['hora_max_proyectado']:.2f}h`**")
-                    st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA` a las **`{result['hora_min_proyectado']:.2f}h`**")
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    st.plotly_chart(plot_daily_profile(daily_profile, proj_profile, show_markers=show_markers), use_container_width=True)
-            
-            # ============== GRÁFICO SEMANAL ==============
-            with tab2:
-                st.markdown("### Perfil Semanal Continuo")
-                st.markdown("Lunes → Domingo (168 horas continuas)")
-                
-                st.plotly_chart(plot_weekly_profile(weekly_profile, show_markers=show_markers), use_container_width=True)
-                
-                # Calculadora semanal
-                st.markdown("---")
-                st.markdown("### 🧮 Calculadora de Proyección Semanal")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    calc_power_w = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="weekly_power")
-                with col2:
-                    calc_day_w = st.selectbox("Día de medición", list(dias_nombres.values()), key="weekly_day")
-                with col3:
-                    calc_hour_w = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="weekly_hour")
-                
-                if st.button("🔮 Calcular Proyección Semanal", key="calc_weekly", type="primary"):
-                    result, proj_profile = calculate_weekly_projection(
-                        weekly_profile, calc_power_w, calc_day_w, calc_hour_w, dias_nombres,
-                        interval_minutes if interval_minutes > 0 else 10
-                    )
-                    
-                    st.markdown("<div class='calc-result'>", unsafe_allow_html=True)
-                    st.markdown(f"**📈 Factor de proporción:** `{result['factor_proporcion']:.4f}`")
-                    st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA`")
-                    st.markdown(f"   → **Día:** {result['dia_max']} | **Hora:** {result['hora_max']}:{int(result['intervalo_max']):02d}")
-                    st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA`")
-                    st.markdown(f"   → **Día:** {result['dia_min']} | **Hora:** {result['hora_min']}:{int(result['intervalo_min']):02d}")
-                    st.markdown("</div>", unsafe_allow_html=True)
-                    
-                    st.plotly_chart(plot_weekly_profile(weekly_profile, proj_profile, show_markers=show_markers), use_container_width=True)
-            
-            # ============== GRÁFICO TOTAL ==============
-            with tab3:
-                st.markdown("### Perfil Total - Todos los Días")
+            # ============== PESTAÑA: VOLTAJE/CORRIENTE ==============
+            with main_tabs[1]:
+                st.markdown("### Gráficos de Voltaje y Corriente")
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    available_dates = sorted(df['starttime'].dt.date.unique())
-                    selected_date = st.selectbox("Resaltar día", 
-                                                 ["Ninguno"] + [str(d) for d in available_dates],
-                                                 key="total_date")
-                    highlight_date = None if selected_date == "Ninguno" else datetime.strptime(selected_date, "%Y-%m-%d").date()
-                
+                    st.plotly_chart(plot_voltage_chart(df, show_markers=show_markers), use_container_width=True)
                 with col2:
-                    st.metric("🔺 Día de MÁXIMA", str(kpis.get('max_date', 'N/A')))
-                    st.metric("🔻 Día de MÍNIMA", str(kpis.get('min_date', 'N/A')))
+                    st.plotly_chart(plot_current_chart(df, show_markers=show_markers), use_container_width=True)
                 
-                st.plotly_chart(plot_total_profile(df, highlight_date, show_markers=show_markers), use_container_width=True)
-                
-                # Calculadora total
-                st.markdown("---")
-                st.markdown("### 🧮 Calculadora de Proyección Total")
-                
-                calc_mode = st.radio("Modo de cálculo:", 
-                    ["📅 Usar día específico", "🔺 Usar día de MÁXIMA carga", "🔻 Usar día de MÍNIMA carga"],
-                    key="calc_mode_total", horizontal=True)
-                
-                col1, col2, col3 = st.columns(3)
+                # Métricas adicionales
+                st.markdown("#### Métricas de Calidad")
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
-                    calc_power_t = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="total_power")
+                    st.metric("⚡ Voltaje Promedio", f"{kpis['avg_voltage']:.1f} V")
+                    st.metric("🔺 Voltaje Máx", f"{kpis['max_voltage']:.1f} V")
+                with col2:
+                    st.metric("⚡ Voltaje Mín", f"{kpis['min_voltage']:.1f} V")
+                    st.metric("🔺 Desbalance V", f"{kpis['voltage_unbalance']:.2f}%")
+                with col3:
+                    st.metric("🔌 Corriente Prom", f"{kpis['avg_current']:.1f} A")
+                    st.metric("🔺 Corriente Máx", f"{kpis['max_current']:.1f} A")
+                with col4:
+                    st.metric("⚡ Factor de Potencia", f"{kpis['power_factor']:.3f}")
+                    st.metric("🔺 Desbalance I", f"{kpis['current_unbalance']:.2f}%")
+            
+            # ============== PESTAÑA: CALCULADORAS ==============
+            with main_tabs[2]:
+                st.markdown("### Calculadoras de Proyección")
                 
-                use_max = "MÁXIMA" in calc_mode
-                use_min = "MÍNIMA" in calc_mode
+                calc_tabs = st.tabs(["📅 Diario", "📆 Semanal", "📊 Total"])
                 
-                if not use_max and not use_min:
-                    with col2:
-                        calc_date_t = st.date_input("Fecha", value=kpis.get('max_date', datetime.now().date()), key="total_date_input")
-                    with col3:
-                        calc_hour_t = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="total_hour")
-                    calc_date = calc_date_t
-                else:
-                    with col2:
-                        calc_hour_t = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="total_hour2")
-                    calc_date = kpis.get('max_date' if use_max else 'min_date', datetime.now().date())
-                    st.info(f"Usando: {calc_date}")
-                
-                if st.button("🔮 Calcular Proyección Total", key="calc_total", type="primary"):
-                    result, proj_data, error = calculate_total_projection(
-                        df, calc_power_t, calc_date, calc_hour_t, use_max, use_min
-                    )
+                # --- Calculadora Diaria ---
+                with calc_tabs[0]:
+                    st.markdown("#### Proyección basada en Perfil Diario")
                     
-                    if error:
-                        st.error(error)
-                    else:
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        calc_power = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="daily_power")
+                    with col2:
+                        calc_hour = st.number_input("Hora de medición", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="daily_hour",
+                                                   help="Hora en formato decimal (ej: 14.5 = 14:30)")
+                    with col3:
+                        st.metric("Intervalo actual", f"{interval_minutes if interval_minutes > 0 else 10} min")
+                    
+                    if st.button("🔮 Calcular Proyección Diaria", key="calc_daily", type="primary"):
+                        result, proj_profile = calculate_daily_projection(daily_profile, calc_power, calc_hour, 
+                                                                          interval_minutes if interval_minutes > 0 else 10)
+                        
                         st.markdown("<div class='calc-result'>", unsafe_allow_html=True)
-                        st.markdown(f"**📋 Base de cálculo:** {result['base_calculo']}")
                         st.markdown(f"**📈 Factor de proporción:** `{result['factor_proporcion']:.4f}`")
-                        st.markdown(f"**📊 Medida ingresada:** `{result['medida_original']:.2f} kVA` a las `{result['hora_medida']:.2f}h`")
-                        st.markdown("---")
-                        st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA`")
-                        st.markdown(f"   → **Hora:** {result['hora_max_proyectado']:.2f}h | **Fecha/Hora:** {result['datetime_max']}")
-                        st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA`")
-                        st.markdown(f"   → **Hora:** {result['hora_min_proyectado']:.2f}h | **Fecha/Hora:** {result['datetime_min']}")
+                        st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA` a las **`{result['hora_max_proyectado']:.2f}h`**")
+                        st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA` a las **`{result['hora_min_proyectado']:.2f}h`**")
                         st.markdown("</div>", unsafe_allow_html=True)
                         
-                        st.plotly_chart(plot_total_profile(df, highlight_date, proj_data, show_markers=show_markers), use_container_width=True)
+                        st.plotly_chart(plot_daily_profile(daily_profile, proj_profile, show_markers=show_markers), use_container_width=True)
+                
+                # --- Calculadora Semanal ---
+                with calc_tabs[1]:
+                    st.markdown("#### Proyección basada en Perfil Semanal")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        calc_power_w = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="weekly_power")
+                    with col2:
+                        calc_day_w = st.selectbox("Día de medición", list(dias_nombres.values()), key="weekly_day")
+                    with col3:
+                        calc_hour_w = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="weekly_hour")
+                    
+                    if st.button("🔮 Calcular Proyección Semanal", key="calc_weekly", type="primary"):
+                        result, proj_profile = calculate_weekly_projection(
+                            weekly_profile, calc_power_w, calc_day_w, calc_hour_w, dias_nombres,
+                            interval_minutes if interval_minutes > 0 else 10
+                        )
+                        
+                        st.markdown("<div class='calc-result'>", unsafe_allow_html=True)
+                        st.markdown(f"**📈 Factor de proporción:** `{result['factor_proporcion']:.4f}`")
+                        st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA`")
+                        st.markdown(f"   → **Día:** {result['dia_max']} | **Hora:** {result['hora_max']}:{int(result['intervalo_max']):02d}")
+                        st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA`")
+                        st.markdown(f"   → **Día:** {result['dia_min']} | **Hora:** {result['hora_min']}:{int(result['intervalo_min']):02d}")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        
+                        st.plotly_chart(plot_weekly_profile(weekly_profile, proj_profile, show_markers=show_markers), use_container_width=True)
+                
+                # --- Calculadora Total ---
+                with calc_tabs[2]:
+                    st.markdown("#### Proyección basada en Día Específico")
+                    
+                    calc_mode = st.radio("Modo de cálculo:", 
+                        ["📅 Usar día específico", "🔺 Usar día de MÁXIMA carga", "🔻 Usar día de MÍNIMA carga"],
+                        key="calc_mode_total", horizontal=True)
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        calc_power_t = st.number_input("Potencia medida (kVA)", min_value=0.0, value=100.0, step=1.0, key="total_power")
+                    
+                    use_max = "MÁXIMA" in calc_mode
+                    use_min = "MÍNIMA" in calc_mode
+                    
+                    if not use_max and not use_min:
+                        with col2:
+                            calc_date_t = st.date_input("Fecha", value=kpis.get('max_date', datetime.now().date()), key="total_date_input")
+                        with col3:
+                            calc_hour_t = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="total_hour")
+                        calc_date = calc_date_t
+                    else:
+                        with col2:
+                            calc_hour_t = st.number_input("Hora", min_value=0.0, max_value=23.99, value=12.0, step=0.25, key="total_hour2")
+                        calc_date = kpis.get('max_date' if use_max else 'min_date', datetime.now().date())
+                        st.info(f"Usando: {calc_date}")
+                    
+                    if st.button("🔮 Calcular Proyección Total", key="calc_total", type="primary"):
+                        result, proj_data, error = calculate_total_projection(
+                            df, calc_power_t, calc_date, calc_hour_t, use_max, use_min
+                        )
+                        
+                        if error:
+                            st.error(error)
+                        else:
+                            st.markdown("<div class='calc-result'>", unsafe_allow_html=True)
+                            st.markdown(f"**📋 Base de cálculo:** {result['base_calculo']}")
+                            st.markdown(f"**📈 Factor de proporción:** `{result['factor_proporcion']:.4f}`")
+                            st.markdown(f"**📊 Medida ingresada:** `{result['medida_original']:.2f} kVA` a las `{result['hora_medida']:.2f}h`")
+                            st.markdown(f"**🔴 Valor MÁXIMO proyectado:** `{result['valor_max_proyectado']:.2f} kVA` a las `{result['hora_max_proyectado']:.2f}h`")
+                            st.markdown(f"**🟢 Valor MÍNIMO proyectado:** `{result['valor_min_proyectado']:.2f} kVA` a las `{result['hora_min_proyectado']:.2f}h`")
+                            st.markdown("</div>", unsafe_allow_html=True)
+                            
+                            st.plotly_chart(plot_total_profile(df, None, proj_data, show_markers=show_markers), use_container_width=True)
             
-            # === OTROS GRÁFICOS ===
+            # === EXPORTAR EXCEL ===
             st.markdown("---")
-            st.subheader("🔌 Voltaje y Corriente por Fase")
-            col1, col2 = st.columns(2)
-            with col1: st.plotly_chart(plot_voltage_chart(df, show_markers=show_markers), use_container_width=True)
-            with col2: st.plotly_chart(plot_current_chart(df, show_markers=show_markers), use_container_width=True)
+            st.subheader("📥 Exportar Datos")
             
-            # === RECOMENDACIONES ===
-            st.markdown("---")
-            st.subheader("💡 Recomendaciones")
-            
-            recs = []
-            if kpis['utilization'] < 40:
-                recs.append(('🔧', 'Transformador Sobredimensionado', f'{kpis["utilization"]:.1f}% utilización'))
-            elif kpis['utilization'] > 80:
-                recs.append(('⚠️', 'Alta Utilización', f'{kpis["utilization"]:.1f}%'))
-            if kpis['power_factor'] < 0.92:
-                recs.append(('📊', 'FP Bajo', f'{kpis["power_factor"]:.3f}'))
-            if kpis['max_pst'] > 1:
-                recs.append(('💡', 'Flicker', f'PST={kpis["max_pst"]:.3f}'))
-            if kpis['max_tdd'] > 5:
-                recs.append(('🌊', 'Armónicos', f'TDD={kpis["max_tdd"]:.2f}%'))
-            
-            if not recs:
-                recs.append(('✅', 'Sistema Normal', 'Continúe monitoreo'))
-            
-            for icon, title, desc in recs:
-                st.info(f"{icon} **{title}**: {desc}")
-            
-            # === EXPORTAR ===
-            st.markdown("---")
-            st.subheader("📥 Exportar")
             col1, col2, col3 = st.columns(3)
             with col1:
-                csv = pd.DataFrame([kpis]).T.reset_index().to_csv(index=False).encode('utf-8')
-                st.download_button("📊 KPIs (CSV)", csv, f'kpis.csv', 'text/csv')
-            with col2:
-                st.download_button("📈 Datos (CSV)", df.to_csv(index=False).encode('utf-8'), f'datos.csv', 'text/csv')
-            with col3:
                 buffer = BytesIO()
                 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                    pd.DataFrame([kpis]).T.reset_index().to_excel(writer, sheet_name='KPIs', index=False)
+                    df.to_excel(writer, sheet_name='Datos', index=False)
                     daily_profile.to_excel(writer, sheet_name='Perfil_Diario', index=False)
                     weekly_profile.to_excel(writer, sheet_name='Perfil_Semanal', index=False)
-                    df.to_excel(writer, sheet_name='Datos', index=False)
                 buffer.seek(0)
-                st.download_button("📑 Excel Completo", buffer, f'reporte_completo.xlsx',
-                                   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.download_button("📊 Descargar Excel", buffer, "analisis_carga.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            with col2:
+                kpi_df = pd.DataFrame([kpis]).T.reset_index()
+                kpi_df.columns = ['Métrica', 'Valor']
+                buffer2 = BytesIO()
+                with pd.ExcelWriter(buffer2, engine='openpyxl') as writer:
+                    kpi_df.to_excel(writer, sheet_name='KPIs', index=False)
+                buffer2.seek(0)
+                st.download_button("📈 Descargar KPIs", buffer2, "kpis.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
-            with st.expander("🔍 Detalles"):
-                import traceback
+            import traceback
+            with st.expander("Ver detalles del error"):
                 st.code(traceback.format_exc())
     
     else:
-        st.markdown("---")
-        st.info("👆 Sube un archivo Excel (.xlsx) para comenzar")
+        st.info("📁 Sube un archivo Excel para comenzar el análisis")
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("### 📅 Diario\n- Perfil 24h promedio\n- Calculadora de proyección")
-        with col2:
-            st.markdown("### 📆 Semanal\n- Continuo Lun-Dom\n- Marcadores máx/mín")
-        with col3:
-            st.markdown("### 📊 Total\n- Todos los datos\n- Selección de días")
+        with st.expander("ℹ️ Instrucciones"):
+            st.markdown("""
+            **Formato requerido del archivo:**
+            - Hoja "DIAGRAMAS": Información del transformador (KVA NOMINAL, SED)
+            - Hoja de datos: Mediciones con columnas starttime, STotAvg, U1Avg, I1Avg, etc.
+            
+            **Funcionalidades:**
+            - 📊 Gráficos de potencia con marcadores de máximo y mínimo
+            - 🧮 Calculadoras de proyección para cada tipo de perfil
+            - 📐 Selector de intervalo (10 min / 1 hora)
+            - 📥 Exportación a Excel
+            """)
 
 
 if __name__ == "__main__":
